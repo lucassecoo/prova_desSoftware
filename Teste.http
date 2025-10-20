@@ -1,0 +1,26 @@
+@baseUrl = http://localhost:5224
+
+###Criar consumo
+POST {{baseUrl}}/api/consumo/cadastrar
+Content-Type: application/json
+
+{
+  "cpf": "222.255.789-00",
+  "mes": 12,
+  "ano": 2200,
+  "m3Consumidos": 65,
+  "bandeira": "Amarela",
+  "possuiEsgoto": false
+}
+
+###Listar consumos
+GET {{baseUrl}}/api/consumo/listar
+
+###Buscar por parâmetros
+GET {{baseUrl}}/api/consumo/buscar/125.456.789-00/12/2000
+
+###Remover leituras
+DELETE {{baseUrl}}/api/consumo/remover/125.456.789-00/12/2000
+
+###Ver total geral
+GET {{baseUrl}}/api/consumo/total-geral
