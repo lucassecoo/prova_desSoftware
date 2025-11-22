@@ -6,7 +6,19 @@ using System.Numerics;
 
 var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddDbContext<AppDbContext>();
+
+builder.Services.AddCors(options =>
+    options.AddPolicy("Acesso Total",
+        configs => configs
+            .AllowAnyOrigin()
+            .AllowAnyHeader()
+            .AllowAnyMethod())
+);
+
+
 var app = builder.Build();
+
+app.UseCors("Acesso Total");
 
 //calculos
 double CalcConsumoFaturado(double m3Consumidos)
@@ -128,12 +140,11 @@ app.MapPost("/api/consumo/cadastrar", ([FromBody] ConsumoAgua consumoAgua, [From
 //GET /api/consumo/listar
 app.MapGet("/api/consumo/listar", ([FromServices] AppDbContext context) =>
 {
-    var consumos = context.ConsumosDeAgua.ToList();
-    if(consumos.Count() == 0)
+    if(context.ConsumosDeAgua.Count() == 0)
     {
         return Results.NotFound("Sem consumos cadastrados!");
     }
-    return Results.Ok(consumos);
+    return Results.Ok(context.ConsumosDeAgua.ToList());
 });
 
 //GET /api/consumo/buscar/{cpf}/{mes}/{ano}
@@ -171,6 +182,34 @@ app.MapGet("/api/consumo/total-geral", ([FromServices] AppDbContext context) =>
 
     var total = context.ConsumosDeAgua.Sum(f => f.Total);
     return Results.Ok($"Total geral: " + total);
+});
+
+app.MapPatch("/api/consumo/alterar/{id}",
+    ([FromRoute] int id,
+    [FromBody] ConsumoAgua consumoAlterado,
+    [FromServices] AppDbContext ctx) =>
+{
+    ConsumoAgua? resultado = ctx.ConsumosDeAgua.Find(id);
+    if (resultado is null)
+    {
+        return Results.NotFound("Produto não encontrado!");
+    }
+    resultado.Mes = consumoAlterado.Mes;
+    resultado.Ano = consumoAlterado.Ano;
+    resultado.M3Consumidos = consumoAlterado.M3Consumidos;
+    resultado.Bandeira = consumoAlterado.Bandeira;
+    resultado.PossuiEsgoto = consumoAlterado.PossuiEsgoto;
+
+    resultado.ConsumoFaturado = CalcConsumoFaturado(resultado.M3Consumidos);
+    resultado.ValorAgua = CalcValorAgua(resultado.M3Consumidos);
+    resultado.Tarifa = CalcTarifa(resultado.M3Consumidos);
+    resultado.AdicionalBandeira = CalcBandeira(resultado.Bandeira!, resultado.ValorAgua);
+    resultado.TaxaEsgoto = CalcTaxaEsgoto(resultado.PossuiEsgoto, resultado.ValorAgua, resultado.AdicionalBandeira);
+    resultado.Total = CalcTotalGeral(resultado.ValorAgua, resultado.AdicionalBandeira, resultado.TaxaEsgoto);
+
+    ctx.ConsumosDeAgua.Update(resultado);
+    ctx.SaveChanges();
+    return Results.Ok(resultado);
 });
 
 app.Run();
